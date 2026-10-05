@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>ラマダッシュ</title>
+<meta name="theme-color" content="#2b4a8a">
+<meta name="description" content="ラマを操作して障害物をよけ、宝石を集める横スクロールランゲーム">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ラマダッシュ">
+<script src="config.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet">
@@ -131,6 +141,37 @@ button:focus-visible{outline:3px solid var(--weave-b);outline-offset:3px}
 @media (prefers-reduced-motion: reduce){
   @keyframes logoFly{0%{transform:scale(1);opacity:0}25%,75%{transform:scale(1);opacity:1}100%{transform:scale(1);opacity:0}}
 }
+
+.hidden{display:none!important}
+.card{max-height:calc(100% - 8px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.appicon{width:64px;height:64px;border-radius:16px;display:block;margin:6px auto 0;box-shadow:0 3px 0 rgba(0,0,0,.2);object-fit:cover}
+.btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+.btns #startBtn{margin-top:0}
+button.sub{
+  border:2px solid #2b4a8a;background:transparent;color:inherit;cursor:pointer;
+  font-family:"Mochiy Pop One",system-ui,sans-serif;font-size:16px;border-radius:16px;padding:10px 18px;
+}
+:root[data-theme="dark"] button.sub{border-color:#9db4ff}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) button.sub{border-color:#9db4ff} }
+.card h2{font-family:"Mochiy Pop One",system-ui,sans-serif;font-weight:400;font-size:24px;margin:10px 0 8px}
+.mybest{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;font-size:15px;margin:6px 0}
+.mybest b{font-family:"Mochiy Pop One",system-ui,sans-serif;font-weight:400;font-size:20px}
+.board{list-style:none;margin:8px 0 0;padding:0;text-align:left;font-size:14px}
+.board li{display:grid;grid-template-columns:2.4em 1fr auto;gap:8px;align-items:center;padding:6px 10px;border-radius:10px}
+.board li:nth-child(odd){background:rgba(127,127,127,.09)}
+.board li.mine{background:rgba(214,51,108,.16);font-weight:800}
+.board .rk{font-family:"Mochiy Pop One",system-ui,sans-serif;text-align:right}
+.board .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board .sc{font-variant-numeric:tabular-nums}
+.board .tag{font-size:11px;font-weight:500;opacity:.75;margin-left:4px}
+.board .sep{background:none!important;justify-items:center;grid-template-columns:1fr;opacity:.5;padding:0}
+.status{font-size:12px!important;opacity:.75;margin:8px 0 0!important}
+.namerow{display:flex;gap:8px;justify-content:center;align-items:center;margin:10px 0 4px;font-size:13px}
+.namerow input{
+  width:11em;font:inherit;font-size:15px;padding:7px 10px;border-radius:10px;
+  border:2px solid rgba(127,127,127,.4);background:rgba(255,255,255,.7);color:#2a1a12;
+}
+.namerow input:focus{outline:none;border-color:#d6336c}
 </style>
 </head>
 <body>
@@ -153,12 +194,20 @@ button:focus-visible{outline:3px solid var(--weave-b);outline-offset:3px}
     </div>
     <div id="overlay">
       <div class="card" id="card">
+        <img class="appicon" src="icons/icon-192.png" alt="">
         <h1>ラマダッシュ</h1>
         <p>障害物をよけて宝石を集めよう。記録は宝石のポイントと走った距離の合計。</p>
         <div class="how"><span>タップ → ジャンプ</span><span>長押し → 大ジャンプ</span></div>
-        <p style="font-size:13px;opacity:.8">低い障害物と落とし穴はジャンプ、高い障害物は大ジャンプ、空の障害物は跳ばずにくぐろう</p>
-        <p style="font-size:13px;opacity:.8">ルビー 10 ・ サファイア 20 ・ ダイヤ 50</p>
-        <button id="startBtn">スタート</button>
+        <p style="font-size:13px;opacity:.8">低い障害物と落とし穴はジャンプ、高い障害物は大ジャンプ、空の障害物は跳ばずにくぐろう。ルビー 10 ・ サファイア 20 ・ ダイヤ 50</p>
+        <div class="btns"><button id="startBtn">スタート</button><button class="sub" data-rank>🏆 ランキング</button></div>
+      </div>
+      <div class="card hidden" id="rankCard">
+        <h2>🏆 ランキング</h2>
+        <div class="mybest" id="rankMe"></div>
+        <div class="namerow"><label for="nameInput">ニックネーム</label><input id="nameInput" maxlength="12" autocomplete="off" enterkeyhint="done"></div>
+        <ol class="board" id="rankList"></ol>
+        <p class="status" id="rankStatus"></p>
+        <div class="btns"><button class="sub" id="rankClose">とじる</button></div>
       </div>
     </div>
   </div>
@@ -412,7 +461,7 @@ button:focus-visible{outline:3px solid var(--weave-b);outline-offset:3px}
   }
 
   stage.addEventListener('pointerdown', e => {
-    if (e.target.closest('#soundBtn') || e.target.closest('#startBtn')) return;
+    if (e.target.closest('#soundBtn') || e.target.closest('.card')) return;
     e.preventDefault();
     pressStart();
   });
@@ -422,6 +471,8 @@ button:focus-visible{outline:3px solid var(--weave-b);outline-offset:3px}
   stage.addEventListener('contextmenu', e => e.preventDefault());
 
   window.addEventListener('keydown', e => {
+    if (e.target && e.target.tagName === 'INPUT'){ if (e.key === 'Enter') e.target.blur(); return; }
+    if (!rankCard.classList.contains('hidden')) return;
     if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter'){
       e.preventDefault();
       if (!e.repeat) pressStart();
@@ -453,15 +504,20 @@ button:focus-visible{outline:3px solid var(--weave-b);outline-offset:3px}
     const isBest = total > best;
     if (isBest){ best = total; try { localStorage.setItem('llama-best-total', String(best)); } catch(e){} }
     bestChip.textContent = 'ベスト ' + best;
+    Ranking.onNewResult();
     setTimeout(() => {
       card.innerHTML = `
-        <h1>${isBest ? 'ベスト更新！' : 'ぶつかった！'}</h1>
+        <h1>${isBest ? '自己ベスト更新！' : 'ぶつかった！'}</h1>
         <div class="big">${total}</div>
         <p>宝石 ${score} pt ＋ 距離 ${meters} m</p>
-        <p style="font-size:13px;opacity:.8">ベスト ${best}</p>
-        <button id="startBtn">もう一回</button>`;
+        <div class="mybest"><span>自己ベスト <b>${best}</b></span><span id="overRank"></span></div>
+        <p class="status" id="overStatus"></p>
+        <div class="btns"><button id="startBtn">もう一回</button><button class="sub" data-rank>🏆 ランキング</button></div>`;
       document.getElementById('startBtn').addEventListener('click', start);
+      bindRankButtons();
+      showMain();
       overlay.classList.remove('hidden');
+      Ranking.renderOver();
     }, 650);
   }
 
@@ -1316,6 +1372,177 @@ button:focus-visible{outline:3px solid var(--weave-b);outline-offset:3px}
   }
   document.addEventListener('visibilitychange', () => { last = performance.now(); });
 
+
+
+  // ---- ランキング（Supabase）とオフライン同期 ----
+  const rankCard = document.getElementById('rankCard');
+  const rankList = document.getElementById('rankList');
+  const rankMe = document.getElementById('rankMe');
+  const rankStatus = document.getElementById('rankStatus');
+  const nameInput = document.getElementById('nameInput');
+  function showMain(){ rankCard.classList.add('hidden'); card.classList.remove('hidden'); }
+  function showRank(){ card.classList.add('hidden'); rankCard.classList.remove('hidden'); Ranking.render(); Ranking.sync(); }
+  function bindRankButtons(){ document.querySelectorAll('[data-rank]').forEach(b => { b.onclick = showRank; }); }
+  document.getElementById('rankClose').addEventListener('click', showMain);
+  bindRankButtons();
+
+  const Ranking = (() => {
+    const cfg = window.LLAMA_CONFIG || {};
+    const URL_ = (cfg.SUPABASE_URL || '').replace(/\/+$/, '');
+    const KEY = cfg.SUPABASE_ANON_KEY || '';
+    const enabled = !!(URL_ && KEY);
+    const ls = {
+      get(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : v; } catch(e){ return d; } },
+      set(k, v){ try { localStorage.setItem(k, v); } catch(e){} }
+    };
+    function uuid(){
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      const b = new Uint8Array(16); (window.crypto || {}).getRandomValues ? crypto.getRandomValues(b) : b.forEach((_, i) => b[i] = Math.random()*256|0);
+      b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+      const h = [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+      return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+    }
+    // 書き込み用の秘密ID（端末の外に出さない）と、表示用の公開ID
+    let playerId = ls.get('llama-player-id', '');
+    if (!playerId){ playerId = uuid(); ls.set('llama-player-id', playerId); }
+    let pubId = ls.get('llama-pub-id', '');
+    if (!pubId){ pubId = uuid().replace(/-/g, '').slice(0, 12); ls.set('llama-pub-id', pubId); }
+    let name = ls.get('llama-name', '');
+    if (!name){ name = 'ラマ' + (1000 + Math.floor(Math.random() * 9000)); ls.set('llama-name', name); ls.set('llama-name-dirty', '1'); }
+    nameInput.value = name;
+
+    let syncedBest = parseInt(ls.get('llama-synced-best', '-1'), 10);
+    let cache = null;
+    try { cache = JSON.parse(ls.get('llama-board-cache', 'null')); } catch(e){ cache = null; }
+    let busy = false, lastError = '';
+
+    function cleanName(v){ return (v || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, 12); }
+    nameInput.addEventListener('change', () => {
+      const v = cleanName(nameInput.value);
+      if (!v){ nameInput.value = name; return; }
+      nameInput.value = v;
+      if (v !== name){ name = v; ls.set('llama-name', name); ls.set('llama-name-dirty', '1'); render(); sync(); }
+    });
+
+    function headers(){
+      const h = {'Content-Type': 'application/json', 'apikey': KEY};
+      if (KEY.startsWith('eyJ')) h['Authorization'] = 'Bearer ' + KEY; // 旧形式(JWT)のanonキー
+      return h;
+    }
+    async function rpc(fn, body){
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 8000);
+      try {
+        const r = await fetch(`${URL_}/rest/v1/rpc/${fn}`, {method:'POST', headers:headers(), body:JSON.stringify(body), signal:ctl.signal, cache:'no-store'});
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const t = await r.text();
+        return t ? JSON.parse(t) : null;
+      } finally { clearTimeout(timer); }
+    }
+    const pending = () => best > 0 && (best > syncedBest || ls.get('llama-name-dirty', '0') === '1');
+
+    // 送信（未送信の自己ベストや名前変更があれば）→ 最新ランキングの取得
+    async function sync(){
+      if (!enabled || busy) return;
+      if (navigator.onLine === false){ render(); return; }
+      busy = true; lastError = '';
+      try {
+        if (pending()){
+          await rpc('submit_score', {p_player_id: playerId, p_pub_id: pubId, p_name: name, p_best: best});
+          syncedBest = best; ls.set('llama-synced-best', String(best)); ls.set('llama-name-dirty', '0');
+        }
+        const list = await rpc('get_leaderboard', {p_limit: 50});
+        const myRank = best > 0 ? await rpc('get_rank', {p_best: best}) : null;
+        cache = {list: Array.isArray(list) ? list : [], myRank, at: Date.now()};
+        ls.set('llama-board-cache', JSON.stringify(cache));
+      } catch(e){ lastError = 'offline'; }
+      busy = false;
+      render(); renderOver();
+    }
+
+    // 未送信の記録も自分の行に反映して並べ直す
+    function mergedList(){
+      const list = (cache && cache.list ? cache.list : []).map(r => ({...r}));
+      if (best > 0){
+        const mine = list.find(r => r.pub_id === pubId);
+        if (mine){ if (best > mine.best){ mine.best = best; mine.local = true; } mine.name = name; }
+        else list.push({pub_id: pubId, name, best, local: true});
+      }
+      list.sort((a, b) => b.best - a.best);
+      return list;
+    }
+    function myRankNow(list){
+      const idx = list.findIndex(r => r.pub_id === pubId);
+      if (idx >= 0 && idx < 50) return idx + 1;
+      if (cache && cache.myRank && !pending()) return cache.myRank;
+      return null;
+    }
+    function fmtTime(ms){
+      const d = new Date(ms);
+      return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+    function statusText(){
+      if (!enabled) return 'ランキングサーバーが未設定です（自己ベストのみ記録されます）';
+      const parts = [];
+      const offline = navigator.onLine === false || lastError;
+      if (busy) parts.push('ランキングを更新中…');
+      else if (offline) parts.push(cache ? `オフライン中：${fmtTime(cache.at)} 時点のランキングを表示` : 'オフライン中：オンラインになるとランキングが表示されます');
+      else if (cache) parts.push(`${fmtTime(cache.at)} に更新`);
+      if (pending() && !busy) parts.push(`自己ベスト ${best} は未送信です。オンラインになると自動で送信されます`);
+      return parts.join(' ／ ');
+    }
+
+    function render(){
+      rankMe.textContent = '';
+      const list = mergedList();
+      const rank = myRankNow(list);
+      const a = document.createElement('span'); a.append('自己ベスト '); const b = document.createElement('b'); b.textContent = best; a.append(b);
+      rankMe.append(a);
+      if (enabled && rank){ const c = document.createElement('span'); c.append('全体 '); const d = document.createElement('b'); d.textContent = rank + '位'; c.append(d); rankMe.append(c); }
+      rankList.textContent = '';
+      const top = list.slice(0, 20);
+      const row = (r, i) => {
+        const li = document.createElement('li');
+        if (r.pub_id === pubId) li.className = 'mine';
+        const rk = document.createElement('span'); rk.className = 'rk'; rk.textContent = i;
+        const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.name;
+        if (r.pub_id === pubId){ const t = document.createElement('span'); t.className = 'tag'; t.textContent = r.local ? '（あなた・未送信）' : '（あなた）'; nm.append(t); }
+        const sc = document.createElement('span'); sc.className = 'sc'; sc.textContent = r.best;
+        li.append(rk, nm, sc); return li;
+      };
+      top.forEach((r, i) => rankList.append(row(r, i + 1)));
+      const myIdx = list.findIndex(r => r.pub_id === pubId);
+      if (myIdx >= 20 && rank){
+        const sep = document.createElement('li'); sep.className = 'sep'; sep.textContent = '⋯'; rankList.append(sep);
+        rankList.append(row(list[myIdx], rank));
+      }
+      if (!list.length){
+        const li = document.createElement('li'); li.className = 'sep'; li.textContent = enabled ? 'まだ記録がありません' : '—'; rankList.append(li);
+      }
+      rankStatus.textContent = statusText();
+    }
+    function renderOver(){
+      const r = document.getElementById('overRank'), st = document.getElementById('overStatus');
+      if (!r || !st) return;
+      const rank = myRankNow(mergedList());
+      r.textContent = enabled && rank ? `全体 ${rank}位` : '';
+      st.textContent = statusText();
+    }
+    function onNewResult(){ sync(); }
+
+    window.addEventListener('online', sync);
+    window.addEventListener('offline', () => { render(); renderOver(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
+    setInterval(() => { if (pending()) sync(); }, 60000);
+    render();
+    setTimeout(sync, 1500);
+    return {sync, render, renderOver, onNewResult};
+  })();
+
+  // ---- オフライン対応（Service Worker） ----
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
+    window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
+  }
 
   // ---- オープニング ----
   const intro = document.getElementById('intro');
