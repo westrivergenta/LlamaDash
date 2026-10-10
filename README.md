@@ -16,6 +16,7 @@
 | `sw.js` | Service Worker（オフライン対応） |
 | `manifest.webmanifest` | アプリ名・アイコンなどの設定 |
 | `icons/` | アプリアイコン（192・512・マスカブル512・Apple 180・ファビコン32） |
+| `audio/start.mp3` | スタート時に流す音楽（流し始めてから3秒後にゲーム開始） |
 | `supabase/schema.sql` | ランキング用のテーブルと関数 |
 
 ## 公開手順

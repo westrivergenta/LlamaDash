@@ -272,11 +272,80 @@ button.sub{
 
   // ---- sound ----
   let actx = null;
+  function audioCtx(){
+    if (!actx){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      actx = new AC();
+    }
+    if (actx.state === 'suspended' && !document.hidden) actx.resume().catch(() => {});
+    return actx;
+  }
+
+  // スタート音楽（audio/start.mp3）：読み込みだけ先に済ませ、最初の操作で音声データに変換しておく
+  const START_MUSIC_URL = 'audio/start.mp3';
+  const MUSIC_VOLUME = 0.9;
+  let musicData = null, musicBuf = null, musicDecoding = null, musicSrc = null, musicGain = null;
+  fetch(START_MUSIC_URL).then(r => r.ok ? r.arrayBuffer() : null).then(b => { musicData = b; prepareMusic(); }).catch(() => {});
+  function prepareMusic(){
+    if (musicBuf || musicDecoding || !musicData || !actx) return musicDecoding;
+    const data = musicData.slice(0);
+    musicDecoding = new Promise(res => {
+      try {
+        const p = actx.decodeAudioData(data, b => { musicBuf = b; res(b); }, () => res(null));
+        if (p && p.then) p.catch(() => res(null));
+      } catch(e){ res(null); }
+    });
+    return musicDecoding;
+  }
+  function playStartMusic(){
+    stopStartMusic(0);
+    if (muted) return;
+    const c = audioCtx(); if (!c) return;
+    const go = () => {
+      if (!musicBuf || muted || (mode !== 'count' && mode !== 'play')) return;
+      const src = c.createBufferSource(), g = c.createGain();
+      g.gain.value = MUSIC_VOLUME;
+      src.buffer = musicBuf; src.connect(g); g.connect(c.destination);
+      src.onended = () => { if (musicSrc === src){ musicSrc = null; musicGain = null; } };
+      src.start(); musicSrc = src; musicGain = g;
+    };
+    if (musicBuf) go();
+    else { const p = prepareMusic(); if (p) p.then(() => { if (mode === 'count') go(); }); } // 変換が間に合わなければ、カウント中に限り変換後に鳴らす
+  }
+  function stopStartMusic(fade){
+    const src = musicSrc, g = musicGain;
+    musicSrc = null; musicGain = null;
+    if (!src) return;
+    try {
+      const now = actx.currentTime;
+      if (fade && g){ g.gain.setValueAtTime(g.gain.value, now); g.gain.linearRampToValueAtTime(0, now + fade); src.stop(now + fade + 0.02); }
+      else src.stop();
+    } catch(e){}
+  }
+  // 最初の操作で音声の準備（スマホは操作の中でしか音を鳴らせないため）
+  let audioUnlocked = false;
+  function unlockAudio(){
+    const c = audioCtx(); if (!c) return;
+    prepareMusic();
+    if (audioUnlocked) return;
+    try { // iPhone向け：無音を一瞬鳴らして音声を使える状態にする
+      const b = c.createBuffer(1, 1, 22050), src = c.createBufferSource();
+      src.buffer = b; src.connect(c.destination); src.start(0);
+      audioUnlocked = true;
+    } catch(e){}
+  }
+  ['pointerdown', 'keydown', 'touchend', 'click'].forEach(t => window.addEventListener(t, unlockAudio, {capture:true, passive:true}));
+  // アプリを裏に回したら音を止め、戻したら再開（カウントダウンと音楽がずれないように）
+  document.addEventListener('visibilitychange', () => {
+    if (!actx) return;
+    if (document.hidden) actx.suspend().catch(() => {}); else actx.resume().catch(() => {});
+  });
+
   function sfx(type){
     if (muted) return;
     try{
-      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-      if (actx.state === 'suspended') actx.resume();
+      if (!audioCtx()) return;
       const now = actx.currentTime;
       const o = actx.createOscillator(), gn = actx.createGain();
       o.connect(gn); gn.connect(actx.destination);
@@ -289,11 +358,14 @@ button.sub{
   soundBtn.addEventListener('click', () => {
     muted = !muted;
     soundBtn.textContent = muted ? '🔇' : '🔊';
+    if (muted) stopStartMusic(0.1);
     try { localStorage.setItem('llama-muted', muted ? '1' : '0'); } catch(e){}
   });
 
   // ---- game state ----
-  let mode = 'ready'; // ready | play | over
+  let mode = 'ready'; // ready | count | play | over
+  const COUNTDOWN = 3;         // スタートを押してからゲームが始まるまでの秒数
+  let countT = 0;
   let llama, obstacles, gems, particles, popups, speed, dist, score, gemCount, t, shake, nextObsX, bgOff, overTimer;
   let holding = false, holdTime = 0;
   const HOLD_TIME = 0.17;      // これ以上押し続けると大ジャンプ
@@ -434,6 +506,7 @@ button.sub{
   function pressStart(){
     if (!introDone){ endIntro(); return; }
     if (mode === 'ready'){ start(); return; }
+    if (mode === 'count') return;
     if (mode === 'over'){ if (overTimer > 0.8) start(); return; }
     holding = true; holdTime = 0;
     llama.buffer = true; llama.bufferT = 0.12;
@@ -487,13 +560,14 @@ button.sub{
     readTheme();
     reset();
     holding = false;
-    mode = 'play';
+    mode = 'count'; countT = 0;   // 音楽を流して3秒後にスタート
     overlay.classList.add('hidden');
-    sfx('jump');
+    playStartMusic();
   }
 
   function gameOver(){
     mode = 'over';
+    stopStartMusic(0.15);
     holding = false;
     shake = 0.35;
     sfx('hit');
@@ -507,7 +581,7 @@ button.sub{
     Ranking.onNewResult();
     setTimeout(() => {
       card.innerHTML = `
-        <h1>${isBest ? '自己ベスト更新！' : 'ぶつかった！'}</h1>
+        <h1>${isBest ? '自己ベスト更新！' : (llama.falling ? 'おちた！' : 'ぶつかった！')}</h1>
         <div class="big">${total}</div>
         <p>宝石 ${score} pt ＋ 距離 ${meters} m</p>
         <div class="mybest"><span>自己ベスト <b>${best}</b></span><span id="overRank"></span></div>
@@ -535,6 +609,11 @@ button.sub{
       if (llama.falling && llama.y < GROUND + 140){ llama.vy += G * dt; llama.y += llama.vy * dt; }
       stepParticles(dt);
       return;
+    }
+    if (mode === 'count'){
+      countT += dt;
+      if (countT >= COUNTDOWN){ mode = 'play'; t = 0; }
+      else return;
     }
     if (mode !== 'play'){ bgOff += 40*dt; return; }
 
@@ -1311,6 +1390,28 @@ button.sub{
     ctx.restore();
   }
 
+  // カウントダウン表示：3 → 2 → 1（各1秒）→「スタート！」（0.7秒）
+  function drawCountdown(){
+    let text, k;
+    if (mode === 'count'){ const left = COUNTDOWN - countT; text = String(Math.ceil(left)); k = 1 - (left - Math.floor(left)); if (left === Math.ceil(left)) k = 0; }
+    else if (mode === 'play' && t < 0.7){ text = 'スタート！'; k = t / 0.7; }
+    else return;
+    const big = text.length === 1;
+    const pop = k < 0.15 ? 0.6 + (k / 0.15) * 0.55 : 1.15 - Math.min(1, (k - 0.15) / 0.2) * 0.15; // ぽんっと出る
+    const alpha = mode === 'play' ? Math.max(0, 1 - Math.max(0, k - 0.5) * 2) : (k > 0.85 ? (1 - k) / 0.15 : 1);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(VW / 2, 150);
+    ctx.scale(pop, pop);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    ctx.font = (big ? '96px' : '52px') + ' "Mochiy Pop One", "M PLUS Rounded 1c", sans-serif';
+    ctx.lineWidth = big ? 12 : 9; ctx.strokeStyle = big ? '#2b4a8a' : '#d6336c';
+    ctx.strokeText(text, 0, 0);
+    ctx.fillStyle = '#fff8ec'; ctx.fillText(text, 0, 0);
+    ctx.restore();
+    ctx.textBaseline = 'alphabetic';
+  }
+
   function draw(){
     ctx.setTransform(1,0,0,1,0,0);
     ctx.clearRect(0, 0, cvs.width, cvs.height);
@@ -1330,6 +1431,7 @@ button.sub{
       else ctx.fillRect(p.x, p.y, p.size, p.size);
     }
     ctx.globalAlpha = 1;
+    drawCountdown();
     if (banner && mode === 'play'){
       const a = Math.min(1, banner.life / 0.4, (2.2 - banner.life) / 0.25);
       ctx.globalAlpha = Math.max(0, a);
